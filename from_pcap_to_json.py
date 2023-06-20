@@ -14,8 +14,10 @@ for packet in scapy_cap:
     data["paquets"].append({"src": packet[0].src, "dst": packet[0].dst})
     try:
         data["paquets"][index].update({"ip_src": packet[1].psrc})
+        data["paquets"][index].update({"ttl": packet[1].ttl})
     except (AttributeError, IndexError):
         data["paquets"][index].update({"ip_src": None})
+        data["paquets"][index].update({"ttl": None})
     try:
         data["paquets"][index].update({"ip_dst": packet[1].pdst})
     except (AttributeError, IndexError):
