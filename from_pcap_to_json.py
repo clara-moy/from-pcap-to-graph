@@ -4,7 +4,7 @@ from time import time
 
 
 start = time()
-n_sample = "3"
+n_sample = "1"
 print("Extracting data...")
 scapy_cap = rdpcap("data/sample_" + n_sample + ".pcap")
 print("Creating dictionnary...")
@@ -15,6 +15,7 @@ data["paquets"] = []
 index = 0
 for packet in scapy_cap:
     data["paquets"].append({"src": packet[0].src, "dst": packet[0].dst})
+    data["paquets"][index].update({"type": packet[0].type})
 
     try:
         data["paquets"][index].update({"ip_src": packet[1].psrc})
@@ -22,6 +23,12 @@ for packet in scapy_cap:
     except (AttributeError, IndexError):
         data["paquets"][index].update({"ip_src": None})
         data["paquets"][index].update({"ip_dst": None})
+
+    try:
+        data["paquets"][index].update({"ip_src": packet[1].src})
+        data["paquets"][index].update({"ip_dst": packet[1].dst})
+    except (AttributeError, IndexError):
+        pass
 
     try:
         data["paquets"][index].update({"proto": packet[1].proto})

@@ -13,12 +13,14 @@ import socket
 
 print("Extracting data...")
 start = time()
-with open("data/json_data_3.json") as file:
+with open("data/json_data_1.json") as file:
     data = json.load(file)
 with open("numbers/ports.json") as file:
     ports_db = json.load(file)
 with open("numbers/ip-protocol-numbers.json") as file:
     ip_protocols_db = json.load(file)
+with open("numbers/ethertypes.json") as file:
+    ethertypes = json.load(file)
 
 print("Creating graph...")
 
@@ -26,7 +28,8 @@ print("Creating graph...")
 list_nodes = []
 list_edges = []
 mac = {}
-ip = {i: [] for i in range(len(data["paquets"]))}
+ipv4 = {i: [] for i in range(len(data["paquets"]))}
+ipv6 = {i: [] for i in range(len(data["paquets"]))}
 port = {i: [] for i in range(len(data["paquets"]))}
 service = {i: [] for i in range(len(data["paquets"]))}
 node_color = {i: "magenta" for i in range(len(data["paquets"]))}
@@ -48,12 +51,21 @@ for packet in data["paquets"]:
     mac[src_index] = src
     mac[dst_index] = dst
 
-    ip_src = packet["ip_src"]
-    ip_dst = packet["ip_dst"]
-    if ip_src not in ip[src_index]:
-        ip[src_index].append(ip_src)
-    if ip_dst not in ip[dst_index]:
-        ip[dst_index].append(ip_dst)
+    ethertype = ethertypes[str(packet["type"])]
+    if ethertype == "ipV6":
+        ipv6_src = packet["ip_src"]
+        ipv6_dst = packet["ip_dst"]
+        if ipv6_src not in ipv6[src_index]:
+            ipv6[src_index].append(ipv6_src)
+        if ipv6_dst not in ipv6[dst_index]:
+            ipv6[dst_index].append(ipv6_dst)
+    else:
+        ipv4_src = packet["ip_src"]
+        ipv4_dst = packet["ip_dst"]
+        if ipv4_src not in ipv4[src_index]:
+            ipv4[src_index].append(ipv4_src)
+        if ipv4_dst not in ipv4[dst_index]:
+            ipv4[dst_index].append(ipv4_dst)
 
     port_src = packet["port_src"]
     port_dst = packet["port_dst"]
@@ -110,11 +122,16 @@ for node in graph:
         node_color[node] = "pink"
     elif ">1024" not in port[node]:
         node_color[node] = "blue"
-    elif port[node] != [">1024"]:
+    elif (
+        port[node] != [">1024"]
+        and port[node] != [None, ">1024"]
+        and port[node] != [">1024", None]
+    ):
         node_color[node] = "cyan"
 
 nx.set_node_attributes(graph, name="MAC", values=mac)
-nx.set_node_attributes(graph, name="IP", values=ip)
+nx.set_node_attributes(graph, name="IP_v4", values=ipv4)
+nx.set_node_attributes(graph, name="IP_v6", values=ipv6)
 nx.set_node_attributes(graph, name="node color", values=node_color)
 nx.set_node_attributes(graph, name="port", values=port)
 nx.set_node_attributes(graph, name="service", values=service)
@@ -133,7 +150,8 @@ plot = figure(
 hover_nodes = HoverTool(
     tooltips=[
         ("MAC", "@MAC"),
-        ("IP", "@IP"),
+        ("IP v4", "@IP_v4"),
+        ("IP v6", "@IP_v6"),
         ("Port", "@port"),
         ("service", "@service"),
     ],
