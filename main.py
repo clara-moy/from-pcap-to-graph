@@ -13,7 +13,7 @@ import socket
 
 print("Extracting data...")
 start = time()
-with open("data/json_data_1.json") as file:
+with open("data/json_data_4.json") as file:
     data = json.load(file)
 with open("numbers/ports.json") as file:
     ports_db = json.load(file)
@@ -50,8 +50,10 @@ for packet in data["paquets"]:
 
     mac[src_index] = src
     mac[dst_index] = dst
-
-    ethertype = ethertypes[str(packet["type"])]
+    try:
+        ethertype = ethertypes[str(packet["type"])]
+    except KeyError:
+        ethertype = "unknown"
     if ethertype == "ipV6":
         ipv6_src = packet["ip_src"]
         ipv6_dst = packet["ip_dst"]
