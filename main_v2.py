@@ -2,9 +2,7 @@
 
 import json
 from bokeh.io import show
-from bokeh.models import (
-    HoverTool,
-)
+from bokeh.models import HoverTool
 from bokeh.plotting import figure
 import numpy as np
 from time import time
@@ -14,7 +12,7 @@ import getmac
 
 print("Extracting data...")
 start = time()
-with open("data/json_data_Friday.json") as file:
+with open("data/json_data_3.json") as file:
     data = json.load(file)
 with open("numbers/ip-protocol-numbers.json") as file:
     ip_protocols_db = json.load(file)
@@ -40,11 +38,10 @@ node_color = {i: "magenta" for i in range(len(data["paquets"]))}
 # outline_color = {i: "black" for i in range(len(data["paquets"]))}
 n_pkts = {}
 
-# Create local network
+# Create graph
 graph = nx.Graph()
 
-# serach router
-
+# search router
 for packet in data["paquets"]:
     if packet["port_src"] == 80:
         router = 0
@@ -66,6 +63,13 @@ for packet in data["paquets"]:
         # Create mac adress list
         src = packet["src"]
         dst = packet["dst"]
+        ipv4_src = packet["ip_src"]
+        ipv4_dst = packet["ip_dst"]
+        ipv6_src = packet["ip_src"]
+        ipv6_dst = packet["ip_dst"]
+        port_src = packet["port_src"]
+        port_dst = packet["port_dst"]
+
         if src not in list_nodes:
             list_nodes.append(src)
         if dst not in list_nodes:
@@ -78,46 +82,36 @@ for packet in data["paquets"]:
         mac[dst_index] = dst
 
         if src_index == router:
-            if ipv4_dst not in list_nodes:
-                list_nodes.append(ipv4_dst)
-            n = list_nodes.index(ipv4_dst)
-            if n not in list_nodes_wan:
-                list_nodes_wan.append(n)
-            ip_wan[n] = ipv4_dst
-            graph.add_edge(n, dst_index)
-            mac[n] = None
-            src_index = n
-        if dst_index == router:
             if ipv4_src not in list_nodes:
                 list_nodes.append(ipv4_src)
             n = list_nodes.index(ipv4_src)
             if n not in list_nodes_wan:
                 list_nodes_wan.append(n)
-            ip_wan[n] = ipv4_src
-            graph.add_edge(src_index, n)
+            mac[n] = None
+            src_index = n
+        if dst_index == router:
+            if ipv4_dst not in list_nodes:
+                list_nodes.append(ipv4_dst)
+            n = list_nodes.index(ipv4_dst)
+            if n not in list_nodes_wan:
+                list_nodes_wan.append(n)
             mac[n] = None
             dst_index = n
 
         # Associate ipV6 adress to mac adress
         if ethertype == "ipV6":
-            ipv6_src = packet["ip_src"]
-            ipv6_dst = packet["ip_dst"]
             if ipv6_src not in ipv6[src_index]:
                 ipv6[src_index].append(ipv6_src)
             if ipv6_dst not in ipv6[dst_index]:
                 ipv6[dst_index].append(ipv6_dst)
         # Associate ipV4 adress to mac adress
         else:
-            ipv4_src = packet["ip_src"]
-            ipv4_dst = packet["ip_dst"]
             if ipv4_src not in ipv4[src_index]:
                 ipv4[src_index].append(ipv4_src)
             if ipv4_dst not in ipv4[dst_index]:
                 ipv4[dst_index].append(ipv4_dst)
 
         # Associate port to mac adress
-        port_src = packet["port_src"]
-        port_dst = packet["port_dst"]
 
         if port_src != None and port_src > 1024:
             port_src = ">1024"
@@ -138,16 +132,10 @@ for packet in data["paquets"]:
                     service_src = socket.getservbyport(port_src, proto)
                     if service_src not in service[src_index]:
                         service[src_index].append(service_src)
-                    if service_src == "http" or service_src == "https":
-                        router = src_index
-                        # graph_lan.add_node(src_index, pos=(0, 12))
                 if port_dst != ">1024" and port_dst != None:
                     service_dst = socket.getservbyport(port_dst, proto)
                     if service_dst not in service[dst_index]:
                         service[dst_index].append(service_dst)
-                    if service_dst == "http" or service_dst == "https":
-                        router = dst_index
-                        # graph_lan.add_node(dst_index, pos=(12, 0))
             except OSError:
                 if (
                     port_src != ">1024"
@@ -218,9 +206,8 @@ plot = figure(
     width_policy="max",
 )
 
-
-# move router to (1.1, 0)
-fixed_layout = nx.random_layout(graph, center=(0, 0))
+# create layout
+fixed_layout = {}
 n_servers = len(list_nodes_wan)
 n_non_servers = len(list_nodes_lan)
 angles = np.linspace(-np.pi / 2, np.pi / 2, n_non_servers)
@@ -230,9 +217,7 @@ pos = np.linspace(-1, 1, n_servers)
 for i in range(len(list_nodes_wan)):
     fixed_layout[list_nodes_wan[i]] = (3, pos[i])
 fixed_layout_provider = StaticLayoutProvider(graph_layout=fixed_layout)
-# create renderer
 graph_renderer = from_networkx(graph, nx.spring_layout)
-# choose layout
 graph_renderer.layout_provider = fixed_layout_provider
 
 hover_nodes = HoverTool(
