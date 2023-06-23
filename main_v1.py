@@ -11,8 +11,6 @@ print("Extracting data...")
 start = time()
 with open("data/json_data_Friday.json") as file:
     data = json.load(file)
-with open("numbers/ports.json") as file:
-    ports_db = json.load(file)
 with open("numbers/ip-protocol-numbers.json") as file:
     ip_protocols_db = json.load(file)
 with open("numbers/ethertypes.json") as file:
