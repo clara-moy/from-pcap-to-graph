@@ -4,9 +4,9 @@ from time import time
 
 
 start = time()
-n_sample = "4"
+n_sample = "Friday"
 print("Extracting data...")
-scapy_cap = rdpcap("data/sample_" + n_sample + ".pcap")
+scapy_cap = rdpcap("data/file1")
 print("Creating dictionnary...")
 data = {}
 data["paquets"] = []
