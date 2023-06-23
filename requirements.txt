@@ -1,0 +1,10 @@
+scipy
+json
+bokeh
+getmac
+time
+socket
+scapy
+numpy
+networkx
+holoviews
