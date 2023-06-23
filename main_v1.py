@@ -1,16 +1,11 @@
 import json
-import networkx as nx
-import numpy as np
 from bokeh.io import show
 import getmac
-from bokeh.models import Circle, MultiLine, HoverTool, StaticLayoutProvider
+from bokeh.models import HoverTool
 from bokeh.plotting import figure
-from bokeh.plotting import from_networkx
 from time import time
 import socket
-from bokeh.resources import CDN
-from bokeh.embed import file_html
-from IPython.display import display, HTML
+from functions import *
 
 print("Extracting data...")
 start = time()
@@ -40,8 +35,9 @@ service = {i: [] for i in range(len(data["paquets"]))}
 node_color = {i: "magenta" for i in range(len(data["paquets"]))}
 # outline_color = {i: "black" for i in range(len(data["paquets"]))}
 n_pkts = {}
-graph_lan = nx.Graph()
 
+# Create local network
+graph_lan = nx.Graph()
 for packet in data["paquets"]:
     try:
         ethertype = ethertypes[str(packet["type"])]
@@ -53,6 +49,7 @@ for packet in data["paquets"]:
         and packet["ip_src"][:4] != "ff02"
         and packet["ip_dst"][:4] != "ff02"
     ):
+        # Create mac adress list
         src = packet["src"]
         dst = packet["dst"]
 
@@ -67,6 +64,7 @@ for packet in data["paquets"]:
         mac[src_index] = src
         mac[dst_index] = dst
 
+        # Associate ipV6 adress to mac adress
         if ethertype == "ipV6":
             ipv6_src = packet["ip_src"]
             ipv6_dst = packet["ip_dst"]
@@ -74,6 +72,7 @@ for packet in data["paquets"]:
                 ipv6[src_index].append(ipv6_src)
             if ipv6_dst not in ipv6[dst_index]:
                 ipv6[dst_index].append(ipv6_dst)
+        # Associate ipV4 adress to mac adress
         else:
             ipv4_src = packet["ip_src"]
             ipv4_dst = packet["ip_dst"]
@@ -82,6 +81,7 @@ for packet in data["paquets"]:
             if ipv4_dst not in ipv4[dst_index]:
                 ipv4[dst_index].append(ipv4_dst)
 
+        # Associate port to mac adress
         port_src = packet["port_src"]
         port_dst = packet["port_dst"]
 
@@ -95,6 +95,7 @@ for packet in data["paquets"]:
         if port_dst not in port[dst_index]:
             port[dst_index].append(port_dst)
 
+        # Find service from port and protocol
         proto_number = packet["proto"]
         if proto_number != None:
             proto = ip_protocols_db[str(proto_number)]["keyword"].lower()
@@ -127,6 +128,7 @@ for packet in data["paquets"]:
                 ):
                     service[dst_index].append(proto)
 
+        # count packets between devices
         if (src_index, dst_index) in n_pkts.keys():
             n_pkts[(src_index, dst_index)] += 1
         elif (dst_index, src_index) in n_pkts.keys():
@@ -135,9 +137,11 @@ for packet in data["paquets"]:
             n_pkts[(src_index, dst_index)] = 1
         graph_lan.add_edge(src_index, dst_index)
 
+# create wan
 graph_wan = nx.Graph()
 list_nodes_wan = []
 ip_wan = {}
+
 for ip in ipv4[router]:
     list_nodes_wan.append(ip)
     index = list_nodes_wan.index(ip)
@@ -145,6 +149,20 @@ for ip in ipv4[router]:
     graph_wan.add_edge(router, new_index)
     ip_wan[new_index] = ip
 
+for ip in ipv6[router]:
+    list_nodes_wan.append(ip)
+    index = list_nodes_wan.index(ip)
+    new_index = index + len(list_nodes_lan)
+    graph_wan.add_edge(router, new_index)
+    ip_wan[new_index] = ip
+
+ipv4[router] = None
+ipv6[router] = None
+port[router] = None
+service[router] = None
+
+
+print("Adjusting layout...")
 for node in graph_wan:
     node_color[node] = "orange"
 
@@ -177,31 +195,20 @@ nx.set_edge_attributes(graph_lan, name="n_pkts", values=n_pkts)
 nx.set_node_attributes(graph_wan, name="IP", values=ip_wan)
 nx.set_node_attributes(graph_wan, name="node color", values=node_color)
 
-fixed_layout = nx.spring_layout(graph_lan)
-fixed_layout[router] = np.array([1.1, 0])
-fixed_layout_provider = StaticLayoutProvider(graph_layout=fixed_layout)
 
-graph_renderer = from_networkx(graph_lan, nx.spring_layout, center=(0, 0))
-graph_renderer.layout_provider = fixed_layout_provider
+graph_renderer_lan = create_layout(graph_lan, router, (0, 0))
+graph_renderer_wan = create_layout(graph_wan, router, (2.2, 0))
 
-fixed_layout_2 = nx.spring_layout(graph_wan, center=(2.2, 0))
-fixed_layout_2[router] = (1.1, 0)
-fixed_layout_provider_2 = StaticLayoutProvider(graph_layout=fixed_layout_2)
-
-graph_renderer_2 = from_networkx(graph_wan, nx.spring_layout)
-graph_renderer_2.layout_provider = fixed_layout_provider_2
-
-print("Adjusting layout...")
 plot = figure(
     tools="pan,wheel_zoom,save,reset",
     active_scroll="wheel_zoom",
     x_range=(-1.2, 3.3),
     y_range=(-1.2, 1.2),
-    aspect_ratio=2,
     height_policy="max",
+    width_policy="max",
 )
 
-hover_nodes = HoverTool(
+hover_nodes_lan = HoverTool(
     tooltips=[
         ("MAC", "@MAC"),
         ("IP v4", "@IP_v4"),
@@ -209,46 +216,26 @@ hover_nodes = HoverTool(
         ("Port", "@port"),
         ("service", "@service"),
     ],
-    renderers=[graph_renderer.node_renderer],
+    renderers=[graph_renderer_lan.node_renderer],
 )
 
-hover_edges = HoverTool(
+hover_edges_lan = HoverTool(
     tooltips=[("n pkts", "@n_pkts")],
-    renderers=[graph_renderer.edge_renderer],
+    renderers=[graph_renderer_lan.edge_renderer],
 )
 
-hover_servers = HoverTool(
-    tooltips=[("IP", "@IP")], renderers=[graph_renderer_2.node_renderer]
+hover_nodes_wan = HoverTool(
+    tooltips=[("IP", "@IP")], renderers=[graph_renderer_wan.node_renderer]
 )
 
-
-plot.add_tools(hover_edges, hover_nodes, hover_servers)
-
-
-graph_renderer.node_renderer.glyph = Circle(
-    size=8, fill_color="node color"  # , line_color="outline color"
-)
-graph_renderer.node_renderer.hover_glyph = Circle(
-    size=8, fill_color="white", line_width=2
-)
-graph_renderer.edge_renderer.glyph = MultiLine(line_alpha=0.5, line_width=1)
-graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color="black", line_width=2)
+plot.add_tools(hover_edges_lan, hover_nodes_lan, hover_nodes_wan)
 
 
-graph_renderer_2.node_renderer.glyph = Circle(
-    size=8, fill_color="node color"  # , line_color="outline color"
-)
-graph_renderer_2.node_renderer.hover_glyph = Circle(
-    size=8, fill_color="white", line_width=2
-)
-graph_renderer_2.edge_renderer.glyph = MultiLine(line_alpha=0.5, line_width=1)
-graph_renderer_2.edge_renderer.hover_glyph = MultiLine(line_color="black", line_width=2)
+set_style(graph_renderer_lan)
+set_style(graph_renderer_wan)
 
-plot.renderers.append(graph_renderer)
-plot.renderers.append(graph_renderer_2)
-
-html = file_html(plot, CDN, theme="dark_minimal")
-HTML("<center>{}</center>".format(html))
+plot.renderers.append(graph_renderer_lan)
+plot.renderers.append(graph_renderer_wan)
 
 show(plot)
 end = time()
