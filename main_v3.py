@@ -1,21 +1,35 @@
-# Network representation using holoviews
+"""Takes a .json file with log data and plots a directed graph representing who communicates with who (not finished at all)
+Usage:
+=====
+    python3 main_v2.py file_name.json
 
-import json
+    file_name: name of the file (with the relative path) from which we want data
+"""
+
+__authors__ = "Clara Moy"
+__contact__ = "c.m0y@yahoo.com"
+__copyright__ = "MIT"
+__date__ = "2023-06-26"
+
+import sys
+from time import time
+
 from bokeh.io import show
 from bokeh.models import HoverTool
 from bokeh.plotting import figure
-import numpy as np
-from time import time
-import socket
 from functions import *
 import getmac
 import holoviews as hv
+import json
+import socket
+
 
 hv.extension("bokeh")
 
 print("Extracting data...")
+file_name = sys.argv[1]
 start = time()
-with open("data/json_data_Friday.json") as file:
+with open(file_name) as file:
     data = json.load(file)
 with open("numbers/ip-protocol-numbers.json") as file:
     ip_protocols_db = json.load(file)
@@ -58,8 +72,8 @@ for packet in data["paquets"]:
     except (KeyError, TypeError):
         ethertype = "unknown"
     if (
-        packet["ip_src"] != None
-        and packet["ip_dst"] != None
+        packet["ip_src"] is not None
+        and packet["ip_dst"] is not None
         and packet["ip_src"][:4] != "ff02"
         and packet["ip_dst"][:4] != "ff02"
     ):
@@ -116,9 +130,9 @@ for packet in data["paquets"]:
 
         # Associate port to mac adress
 
-        if port_src != None and port_src > 1024:
+        if port_src is not None and port_src > 1024:
             port_src = ">1024"
-        if port_dst != None and port_dst > 1024:
+        if port_dst is not None and port_dst > 1024:
             port_dst = ">1024"
 
         if port_src not in port[src_index]:
@@ -128,27 +142,27 @@ for packet in data["paquets"]:
 
         # Find service from port and protocol
         proto_number = packet["proto"]
-        if proto_number != None:
+        if proto_number is not None:
             proto = ip_protocols_db[str(proto_number)]["keyword"].lower()
             try:
-                if port_src != ">1024" and port_src != None:
+                if port_src != ">1024" and port_src is not None:
                     service_src = socket.getservbyport(port_src, proto)
                     if service_src not in service[src_index]:
                         service[src_index].append(service_src)
-                if port_dst != ">1024" and port_dst != None:
+                if port_dst != ">1024" and port_dst is not None:
                     service_dst = socket.getservbyport(port_dst, proto)
                     if service_dst not in service[dst_index]:
                         service[dst_index].append(service_dst)
             except OSError:
                 if (
                     port_src != ">1024"
-                    and port_src != None
+                    and port_src is not None
                     and proto not in service[src_index]
                 ):
                     service[src_index].append(proto)
                 elif (
                     port_dst != ">1024"
-                    and port_dst != None
+                    and port_dst is not None
                     and proto not in service[dst_index]
                 ):
                     service[dst_index].append(proto)

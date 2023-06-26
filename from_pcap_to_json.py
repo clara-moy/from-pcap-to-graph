@@ -1,12 +1,30 @@
-from scapy.all import *
-import json
+"""Program that takes a .pcap file and creates a .json file with data from the .pcap file
+
+Usage:
+=====
+    python3 from_pcap_to_json.py file_name
+
+    file_name: name of the file (with the relative path) from which we want data
+"""
+
+__authors__ = "Clara Moy"
+__contact__ = "c.m0y@yahoo.com"
+__copyright__ = "MIT"
+__date__ = "2023-06-26"
+
+
+from datetime import datetime
+import sys
 from time import time
 
+import json
+from scapy.all import rdpcap
 
-start = time()
-n_sample = "Friday"
+
 print("Extracting data...")
-scapy_cap = rdpcap("data/file1")
+start = time()
+file_name = sys.argv[1]
+scapy_cap = rdpcap(file_name)
 print("Creating dictionnary...")
 data = {}
 data["paquets"] = []
@@ -55,9 +73,10 @@ for packet in scapy_cap:
 
 
 data_string = json.dumps(data)
-print("Creating json file...")
-with open("data/json_data_" + n_sample + ".json", "w") as outfile:
-    outfile.write(data_string)
 
+print("Creating json file...")
+dt_string = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
+with open("data/json_data_" + dt_string + ".json", "w") as outfile:
+    outfile.write(data_string)
 end = time()
 print("Done in", (end - start) / 60, "min")
