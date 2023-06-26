@@ -1,7 +1,7 @@
 """Takes a .json file with log data and plots a directed graph representing who communicates with who (not finished at all)
 Usage:
 =====
-    python3 main_v2.py file_name.json
+    python3 main_v3.py file_name.json
 
     file_name: name of the file (with the relative path) from which we want data
 """
@@ -21,6 +21,7 @@ from functions import *
 import getmac
 import holoviews as hv
 import json
+import numpy as np
 import socket
 
 

@@ -20,6 +20,7 @@ from bokeh.plotting import figure
 from functions import *
 import getmac
 import json
+import numpy as np
 import socket
 
 print("Extracting data...")
