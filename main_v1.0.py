@@ -1,7 +1,7 @@
 """Takes a .json file with log data and plots a graph representing the topology of the network
 Usage:
 =====
-    python3 main_v1.py file_name.json
+    python3 main_v1.0.py file_name.json
 
     file_name: name of the file (with the relative path) from which we want data
 """
