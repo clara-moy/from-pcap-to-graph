@@ -210,8 +210,8 @@ nx.set_node_attributes(graph_wan, name="IP", values=ip_wan)
 nx.set_node_attributes(graph_wan, name="node color", values=node_color)
 
 
-graph_renderer_lan = create_layout(graph_lan, router, (0, 0))
-graph_renderer_wan = create_layout(graph_wan, router, (2.2, 0))
+graph_renderer_lan = create_layout(graph_lan, router, (0, 0), 1)
+graph_renderer_wan = create_layout(graph_wan, router, (2.2, 0), 1)
 
 plot = figure(
     tools="pan,wheel_zoom,save,reset",
