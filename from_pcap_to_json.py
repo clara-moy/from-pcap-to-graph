@@ -57,10 +57,10 @@ for packet in scapy_cap:
     except (AttributeError, IndexError):
         data["paquets"][index].update({"proto": None})
 
-    try:
-        data["paquets"][index].update({"ttl": packet[1].ttl})
-    except (AttributeError, IndexError):
-        data["paquets"][index].update({"ttl": None})
+    # try:
+    #     data["paquets"][index].update({"ttl": packet[1].ttl})
+    # except (AttributeError, IndexError):
+    #     data["paquets"][index].update({"ttl": None})
 
     try:
         data["paquets"][index].update({"port_src": packet[2].sport})
