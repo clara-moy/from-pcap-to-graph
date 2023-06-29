@@ -16,11 +16,10 @@ import sys
 from time import time
 
 from bokeh.io import show
-from bokeh.models import HoverTool, NodesAndLinkedEdges
+from bokeh.models import HoverTool
 from bokeh.plotting import figure
 from functions import *
 import json
-import socket
 
 print("Extracting data...")
 file_name = sys.argv[1]
@@ -44,18 +43,43 @@ port = {i: [] for i in range(len(data["paquets"]))}
 service = {i: [] for i in range(len(data["paquets"]))}
 node_color = {i: "magenta" for i in range(len(data["paquets"]))}
 n_pkts = {}
+igmp = []
 
+router = 0
+mac[router] = []
 
 for packet in data["paquets"]:
-    if packet["port_src"] == 80:
-        router = 0
-        mac[router] = packet["src"]
-        list_nodes_lan.append(packet["src"])
-        break
+    if packet["port_src"] == 80 or packet["port_src"] == 443:
+        if packet["src"] not in mac[router]:
+            mac[router].append(packet["src"])
+            list_nodes_lan.append(packet["src"])
+#     if packet["proto"] == 2:
+#         igmp.append([packet["ip_src"], packet["ip_dst"]])
+
+# print(igmp)
+
+i = 0
+while len(mac[router]) != 1 and i != 10:
+    print(mac[router])
+    i += 1
+    for packet in data["paquets"]:
+        if packet["src"] in mac[router]:
+            if packet["proto"] == 89 or packet["ip_src"] == "224.0.0.9":
+                print(packet["ip_src"])
+                router = [packet["src"]]
+                break
+            elif packet["proto"] == 1:
+                mac[router].remove(packet["src"])
+
+if len(mac[router]) != 1:
+    print("failed to find router")
+
 
 # Create local network
 graph_lan = nx.Graph()
 for packet in data["paquets"]:
+    if packet["ip_src"] == "192.168.10.15":
+        print("hohoho")
     try:
         ethertype = ethertypes[str(packet["type"])]
     except (KeyError, TypeError):
