@@ -17,7 +17,9 @@ from bokeh.plotting import from_networkx
 from bokeh.models import Circle, MultiLine
 
 
-def create_layout(graph: nx.Graph, router_index: int, center: tuple, scale: float):
+def create_layout(
+    graph: nx.Graph, router_index: int, center: tuple, scale: float, other_router=False
+):
     """This function sets up the layout that places the router in (1.1, 0)
 
     Parameters
@@ -39,6 +41,8 @@ def create_layout(graph: nx.Graph, router_index: int, center: tuple, scale: floa
     # move router to (1.1, 0)
     fixed_layout = nx.circular_layout(graph, center=center, scale=scale)
     fixed_layout[router_index] = (1.1, 0)
+    if other_router != False:
+        fixed_layout[other_router] = center
     fixed_layout_provider = StaticLayoutProvider(graph_layout=fixed_layout)
     # create renderer
     graph_renderer = from_networkx(graph, nx.spring_layout)
