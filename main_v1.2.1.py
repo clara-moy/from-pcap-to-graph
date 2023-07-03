@@ -156,8 +156,6 @@ for subnetwork in graphs_wan:
     node_color[ntwk_index + 1][1] = "green"
     ip_wan[ntwk_index][1] = None
 
-print(node_color)
-
 for node in graph_lan:
     if node == router:
         node_color[0][node] = "green"
