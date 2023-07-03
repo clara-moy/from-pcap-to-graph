@@ -10,7 +10,6 @@ __contact__ = "c.m0y@yahoo.com"
 __copyright__ = "MIT"
 __date__ = "2023-06-26"
 
-
 import networkx as nx
 from bokeh.models import StaticLayoutProvider, NodesAndLinkedEdges
 from bokeh.plotting import from_networkx
@@ -87,6 +86,8 @@ def data_processing(
     ipv6,
     ipv4,
     port,
+    ntwk_prefix=None,
+    subnetworks=None,
 ):
     """_summary_
 
@@ -145,4 +146,75 @@ def data_processing(
             port[index].append(port_device)
     else:
         port[index] = [port_device]
-    return index, port_device
+    if ntwk_prefix != None:
+        if index == 0:
+            if ipv4_device not in list_nodes:
+                list_nodes.append(ipv4_device)
+            new_index = list_nodes.index(ipv4_device)
+            parsed_ip = ipv4_device.split(".")
+            if parsed_ip[0] in [str(i) for i in range(1, 128)]:
+                prefix = parsed_ip[0]
+            elif parsed_ip[0] in [str(i) for i in range(128, 192)]:
+                prefix = parsed_ip[0] + "." + parsed_ip[1]
+            elif parsed_ip[0] in [str(i) for i in range(192, 224)]:
+                prefix = parsed_ip[0] + "." + parsed_ip[1] + "." + parsed_ip[2]
+            if prefix not in ntwk_prefix.keys():
+                list_nodes.append(prefix)
+                ntwk_index = list_nodes.index(prefix)
+                subnetworks[ntwk_index] = []
+            ntwk_index = list_nodes.index(prefix)
+            ntwk_prefix[prefix] = ntwk_index
+            subnetworks[ntwk_index].append(new_index)
+            return index, new_index, ntwk_index, port_device
+        else:
+            subnetworks[0].append(index)
+            return index, index, 0, port_device
+    else:
+        return index, port_device
+
+
+def update_mapping(
+    src_index, dist_src_index, mapping, dst_index, graph_lan, src_ntwk_index
+):
+    if src_index in mapping.keys():
+        if src_index not in mapping[src_index]:
+            mapping[src_index] = [
+                src_index,
+                dst_index,
+                (src_index, dst_index),
+            ]
+        elif dst_index not in mapping[src_index]:
+            mapping[src_index] += [dst_index, (src_index, dst_index)]
+    else:
+        mapping[src_index] = [
+            src_index,
+            dst_index,
+            (src_index, dst_index),
+        ]
+    graph_lan.add_edge(src_index, dst_index)
+    if src_index == 0:
+        graph_lan.add_edge(dist_src_index, src_ntwk_index)
+        graph_lan.add_edge(src_ntwk_index, src_index)
+        if dist_src_index in mapping.keys():
+            if dist_src_index not in mapping[dist_src_index]:
+                mapping[dist_src_index] = [
+                    src_ntwk_index,
+                    dist_src_index,
+                    src_index,
+                    dst_index,
+                    (src_ntwk_index, src_index),
+                    (dist_src_index, src_ntwk_index),
+                    (dst_index, src_index),
+                ]
+            elif dst_index not in mapping[dist_src_index]:
+                mapping[dist_src_index] += [dst_index, (src_index, dst_index)]
+        else:
+            mapping[dist_src_index] = [
+                src_index,
+                dst_index,
+                src_ntwk_index,
+                dist_src_index,
+                (src_ntwk_index, src_index),
+                (dist_src_index, src_ntwk_index),
+                (dst_index, src_index),
+            ]
