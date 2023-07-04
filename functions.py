@@ -164,57 +164,75 @@ def data_processing(
                 subnetworks[ntwk_index] = []
             ntwk_index = list_nodes.index(prefix)
             ntwk_prefix[prefix] = ntwk_index
-            subnetworks[ntwk_index].append(new_index)
+            if new_index not in subnetworks[ntwk_index]:
+                subnetworks[ntwk_index].append(new_index)
             return index, new_index, ntwk_index, port_device
         else:
-            subnetworks[0].append(index)
+            if index not in subnetworks[0]:
+                subnetworks[0].append(index)
             return index, index, 0, port_device
     else:
         return index, port_device
 
 
 def update_mapping(
-    src_index, dist_src_index, mapping, dst_index, graph_lan, src_ntwk_index
+    router_index, dist_device_index, mapping, device_index, graph, ntwk_router_index
 ):
-    if src_index in mapping.keys():
-        if src_index not in mapping[src_index]:
-            mapping[src_index] = [
-                src_index,
-                dst_index,
-                (src_index, dst_index),
+    if router_index in mapping.keys():
+        if router_index not in mapping[router_index]:
+            mapping[router_index] = [
+                router_index,
+                device_index,
+                (router_index, device_index),
+                (device_index, router_index),
             ]
-        elif dst_index not in mapping[src_index]:
-            mapping[src_index] += [dst_index, (src_index, dst_index)]
+        elif device_index not in mapping[router_index]:
+            mapping[router_index] += [
+                device_index,
+                (router_index, device_index),
+                (device_index, router_index),
+            ]
     else:
-        mapping[src_index] = [
-            src_index,
-            dst_index,
-            (src_index, dst_index),
+        mapping[router_index] = [
+            router_index,
+            device_index,
+            (router_index, device_index),
+            (device_index, router_index),
         ]
-    graph_lan.add_edge(src_index, dst_index)
-    if src_index == 0:
-        graph_lan.add_edge(dist_src_index, src_ntwk_index)
-        graph_lan.add_edge(src_ntwk_index, src_index)
-        if dist_src_index in mapping.keys():
-            if dist_src_index not in mapping[dist_src_index]:
-                mapping[dist_src_index] = [
-                    src_ntwk_index,
-                    dist_src_index,
-                    src_index,
-                    dst_index,
-                    (src_ntwk_index, src_index),
-                    (dist_src_index, src_ntwk_index),
-                    (dst_index, src_index),
-                ]
-            elif dst_index not in mapping[dist_src_index]:
-                mapping[dist_src_index] += [dst_index, (src_index, dst_index)]
-        else:
-            mapping[dist_src_index] = [
-                src_index,
-                dst_index,
-                src_ntwk_index,
-                dist_src_index,
-                (src_ntwk_index, src_index),
-                (dist_src_index, src_ntwk_index),
-                (dst_index, src_index),
-            ]
+    graph.add_edge(router_index, device_index)
+    if router_index == 0:
+        graph.add_edge(dist_device_index, ntwk_router_index)
+        graph.add_edge(ntwk_router_index, router_index)
+        update_mapping_wan(
+            dist_device_index, ntwk_router_index, router_index, mapping, device_index
+        )
+        update_mapping_wan(
+            device_index, router_index, ntwk_router_index, mapping, dist_device_index
+        )
+
+
+def update_mapping_wan(
+    device_1_index, router_1_index, router_2_index, mapping, device_2_index
+):
+    if (
+        device_1_index in mapping.keys()
+        and device_2_index not in mapping[device_1_index]
+    ):
+        mapping[device_1_index] += [
+            device_2_index,
+            (router_2_index, device_2_index),
+            (device_2_index, router_2_index),
+        ]
+    else:
+        mapping[device_1_index] = [
+            router_2_index,
+            device_2_index,
+            router_1_index,
+            device_1_index,
+            (router_1_index, router_2_index),
+            (device_1_index, router_1_index),
+            (device_2_index, router_2_index),
+            (router_2_index, router_1_index),
+            (router_1_index, device_1_index),
+            (router_2_index, device_2_index),
+        ]
