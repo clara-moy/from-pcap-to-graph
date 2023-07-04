@@ -21,6 +21,8 @@ import matplotlib.pyplot as plt
 from netgraph._main import InteractiveGraph
 import numpy as np
 
+np.seterr(divide="ignore", invalid="ignore")
+
 print("Extracting data...")
 file_name = sys.argv[1]
 start = time()
@@ -78,7 +80,7 @@ else:
     list_nodes.append(mac[router][0])
 
 # Create local network
-graph_lan = nx.Graph()
+graph = nx.Graph()
 for packet in data["paquets"]:
     try:
         ethertype = ethertypes[str(packet["type"])]
@@ -119,10 +121,10 @@ for packet in data["paquets"]:
             subnetworks,
         )
         update_mapping(
-            src_index, dist_src_index, mapping, dst_index, graph_lan, src_ntwk_index
+            src_index, dist_src_index, mapping, dst_index, graph, src_ntwk_index
         )
         update_mapping(
-            dst_index, dist_dst_index, mapping, src_index, graph_lan, dst_ntwk_index
+            dst_index, dist_dst_index, mapping, src_index, graph, dst_ntwk_index
         )
 
 ipv4[router] = None
@@ -130,19 +132,18 @@ ipv6[router] = None
 port[router] = None
 service[router] = None
 
-
 print("Adjusting layout...")
 
-nx.set_node_attributes(graph_lan, name="MAC", values=mac)
-nx.set_node_attributes(graph_lan, name="IP_v4", values=ipv4)
-nx.set_node_attributes(graph_lan, name="IP_v6", values=ipv6)
-nx.set_node_attributes(graph_lan, name="node color", values=node_color[0])
-nx.set_node_attributes(graph_lan, name="port", values=port)
-nx.set_node_attributes(graph_lan, name="service", values=service)
+# nx.set_node_attributes(graph, name="MAC", values=mac)
+# nx.set_node_attributes(graph, name="IP_v4", values=ipv4)
+# nx.set_node_attributes(graph, name="IP_v6", values=ipv6)
+# nx.set_node_attributes(graph, name="node color", values=node_color[0])
+# nx.set_node_attributes(graph, name="port", values=port)
+# nx.set_node_attributes(graph, name="service", values=service)
 
 node_color = {}
 
-for node in graph_lan:
+for node in graph:
     if node in subnetworks.keys():
         node_color[node] = "green"
     else:
@@ -151,35 +152,31 @@ for node in graph_lan:
 layout = {}
 
 i = 0
+scale = 0.3
 n_subnetworks = len(subnetworks)
-dim = math.sqrt(n_subnetworks)
+dim = round(math.sqrt(n_subnetworks))
 for subnetwork in subnetworks.keys():
     column = round((i - 1) // dim)
-    layout[subnetwork] = (column, i % dim)
-    angles = np.linspace(0, 2 * np.pi, len(subnetworks[subnetwork]))
+    layout[subnetwork] = (column * scale, i % dim * scale)
+    angles = np.linspace(0, 1, len(subnetworks[subnetwork]) + 1)[:-1] * 2 * np.pi
     for j in range(len(subnetworks[subnetwork])):
         angle = angles[j]
-        print(subnetwork, angle)
-        try:
-            layout[subnetworks[subnetwork][j]] = (
-                math.sin(angle + angles[1] / 2) / 3 + column,
-                math.cos(angle + angles[1] / 2) / 3 + i % dim,
-            )
-        except IndexError:
-            layout[subnetworks[subnetwork][j]] = (
-                math.sin(angle) / 3 + column,
-                math.cos(angle) / 3 + i % dim,
-            )
+        layout[subnetworks[subnetwork][j]] = (
+            (math.sin(angle) / 3 + column) * scale,
+            (math.cos(angle) / 3 + i % dim) * scale,
+        )
     i += 1
 
 plot = InteractiveGraph(
-    graph_lan,
+    graph,
     annotations={i: list_nodes[i] for i in range(len(list_nodes))},
     node_labels=True,
     node_layout=layout,
     node_color=node_color,
 )
 
-plt.show()
+plot.mouseover_highlight_mapping = mapping
+
 end = time()
 print("Done in", end - start, "s")
+plt.show()
