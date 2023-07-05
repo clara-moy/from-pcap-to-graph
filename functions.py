@@ -214,15 +214,26 @@ def update_mapping(
 def update_mapping_wan(
     device_1_index, router_1_index, router_2_index, mapping, device_2_index
 ):
-    if (
-        device_1_index in mapping.keys()
-        and device_2_index not in mapping[device_1_index]
-    ):
-        mapping[device_1_index] += [
-            device_2_index,
-            (router_2_index, device_2_index),
-            (device_2_index, router_2_index),
-        ]
+    if device_1_index in mapping.keys():
+        if device_1_index not in mapping[device_1_index]:
+            mapping[device_1_index] = [
+                router_1_index,
+                device_1_index,
+                router_2_index,
+                device_2_index,
+                (router_1_index, router_2_index),
+                (device_1_index, router_1_index),
+                (device_2_index, router_2_index),
+                (router_2_index, router_1_index),
+                (router_1_index, device_1_index),
+                (router_2_index, device_2_index),
+            ]
+        elif device_2_index not in mapping[device_1_index]:
+            mapping[device_1_index] += [
+                device_2_index,
+                (router_2_index, device_2_index),
+                (device_2_index, router_2_index),
+            ]
     else:
         mapping[device_1_index] = [
             router_2_index,
