@@ -21,6 +21,9 @@ import matplotlib.pyplot as plt
 from netgraph._main import InteractiveGraph
 import numpy as np
 
+# from pyvis.network import Network
+from zoom import ZoomPan
+
 np.seterr(divide="ignore", invalid="ignore")
 
 print("Extracting data...")
@@ -134,48 +137,73 @@ service[router] = None
 
 print("Adjusting layout...")
 
-# nx.set_node_attributes(graph, name="MAC", values=mac)
-# nx.set_node_attributes(graph, name="IP_v4", values=ipv4)
-# nx.set_node_attributes(graph, name="IP_v6", values=ipv6)
-# nx.set_node_attributes(graph, name="node color", values=node_color[0])
-# nx.set_node_attributes(graph, name="port", values=port)
-# nx.set_node_attributes(graph, name="service", values=service)
-
 node_color = {}
 
 for node in graph:
     if node in subnetworks.keys():
         node_color[node] = "green"
-    else:
+    elif node in subnetworks[0]:
         node_color[node] = "cyan"
+    else:
+        node_color[node] = "orange"
 
 layout = {}
 
 i = 0
-scale = 0.3
+scale = 0.6
 n_subnetworks = len(subnetworks)
 dim = round(math.sqrt(n_subnetworks))
 for subnetwork in subnetworks.keys():
+    if subnetwork == 0:
+        add = dim * scale / 2.5
+    else:
+        add = 0
     column = round((i - 1) // dim)
-    layout[subnetwork] = (column * scale, i % dim * scale)
+    layout[subnetwork] = (column * scale, i % dim * scale + add)
     angles = np.linspace(0, 1, len(subnetworks[subnetwork]) + 1)[:-1] * 2 * np.pi
     for j in range(len(subnetworks[subnetwork])):
         angle = angles[j]
         layout[subnetworks[subnetwork][j]] = (
             (math.sin(angle) / 3 + column) * scale,
-            (math.cos(angle) / 3 + i % dim) * scale,
+            (math.cos(angle) / 3 + i % dim) * scale + add,
         )
     i += 1
 
-plot = InteractiveGraph(
+annotations = {}
+
+for i in range(len(list_nodes)):
+    if i in mac.keys():
+        annotations[i] = "MAC : " + str(mac[i]) + "\nIP : "
+    else:
+        annotations[i] = "MAC : None\nIP : "
+    if ipv4[i] != None:
+        for ip in ipv4[i]:
+            annotations[i] += ip
+
+# nt = Network("500px", "1000px")
+# node_color_2 = [node_color[i] for i in node_color.keys()]
+# nt.add_nodes(list(graph.nodes), color=node_color_2)
+# nt.add_edges(graph.edges)
+# nt.show("hoho.html")
+
+fig, ax = plt.subplots()
+
+fig = InteractiveGraph(
     graph,
-    annotations={i: list_nodes[i] for i in range(len(list_nodes))},
-    node_labels=True,
+    annotations=annotations,
+    # node_labels=True,
     node_layout=layout,
     node_color=node_color,
+    edge_width=0.4,
+    edge_color="black",
 )
 
-plot.mouseover_highlight_mapping = mapping
+scale = 1.1
+zp = ZoomPan()
+figZoom = zp.zoom_factory(ax, base_scale=scale)
+figPan = zp.pan_factory(ax)
+
+fig.mouseover_highlight_mapping = mapping
 
 end = time()
 print("Done in", end - start, "s")
