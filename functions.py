@@ -151,6 +151,7 @@ def data_processing(
             if ipv4_device not in list_nodes:
                 list_nodes.append(ipv4_device)
             new_index = list_nodes.index(ipv4_device)
+            ipv4[new_index] = ipv4_device
             parsed_ip = ipv4_device.split(".")
             if parsed_ip[0] in [str(i) for i in range(1, 128)]:
                 prefix = parsed_ip[0]
@@ -163,6 +164,7 @@ def data_processing(
                 ntwk_index = list_nodes.index(prefix)
                 subnetworks[ntwk_index] = []
             ntwk_index = list_nodes.index(prefix)
+            ipv4[ntwk_index] = prefix
             ntwk_prefix[prefix] = ntwk_index
             if new_index not in subnetworks[ntwk_index]:
                 subnetworks[ntwk_index].append(new_index)
@@ -176,38 +178,46 @@ def data_processing(
 
 
 def update_mapping(
-    router_index, dist_device_index, mapping, device_index, graph, ntwk_router_index
+    device_1_index, dist_device_index, mapping, device_2_index, graph, ntwk_router_index
 ):
-    if router_index in mapping.keys():
-        if router_index not in mapping[router_index]:
-            mapping[router_index] = [
-                router_index,
-                device_index,
-                (router_index, device_index),
-                (device_index, router_index),
+    if device_1_index in mapping.keys():
+        if device_1_index not in mapping[device_1_index]:
+            mapping[device_1_index] = [
+                device_1_index,
+                device_2_index,
+                (device_1_index, device_2_index),
+                (device_2_index, device_1_index),
             ]
-        elif device_index not in mapping[router_index]:
-            mapping[router_index] += [
-                device_index,
-                (router_index, device_index),
-                (device_index, router_index),
+        elif device_2_index not in mapping[device_1_index]:
+            mapping[device_1_index] += [
+                device_2_index,
+                (device_1_index, device_2_index),
+                (device_2_index, device_1_index),
             ]
     else:
-        mapping[router_index] = [
-            router_index,
-            device_index,
-            (router_index, device_index),
-            (device_index, router_index),
+        mapping[device_1_index] = [
+            device_1_index,
+            device_2_index,
+            (device_1_index, device_2_index),
+            (device_2_index, device_1_index),
         ]
-    graph.add_edge(router_index, device_index)
-    if router_index == 0:
+    graph.add_edge(device_1_index, device_2_index)
+    if device_1_index == 0:
         graph.add_edge(dist_device_index, ntwk_router_index)
-        graph.add_edge(ntwk_router_index, router_index)
+        graph.add_edge(ntwk_router_index, device_1_index)
         update_mapping_wan(
-            dist_device_index, ntwk_router_index, router_index, mapping, device_index
+            dist_device_index,
+            ntwk_router_index,
+            device_1_index,
+            mapping,
+            device_2_index,
         )
         update_mapping_wan(
-            device_index, router_index, ntwk_router_index, mapping, dist_device_index
+            device_2_index,
+            device_1_index,
+            ntwk_router_index,
+            mapping,
+            dist_device_index,
         )
 
 
@@ -234,6 +244,12 @@ def update_mapping_wan(
                 (router_2_index, device_2_index),
                 (device_2_index, router_2_index),
             ]
+            if (router_1_index, router_2_index) not in mapping[device_1_index]:
+                mapping[device_1_index] += [
+                    router_2_index,
+                    (router_1_index, router_2_index),
+                    (router_2_index, router_1_index),
+                ]
     else:
         mapping[device_1_index] = [
             router_2_index,

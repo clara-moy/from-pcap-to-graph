@@ -192,11 +192,11 @@ graph_renderer_lan = create_layout(graph_lan, router, (-0.5, 0), scale=1)
 dim = math.isqrt(len(graphs_wan))
 for index in range(len(graphs_wan)):
     ntwk_index = graphs_wan.index(graphs_wan[index])
-    column = round((index - 1) // dim)
+    column = round((index) // dim)
     graphs_renderers_wan[ntwk_index] = create_layout(
         graphs_wan[ntwk_index],
         router,
-        (column + 2.2, index % dim - dim / 2),
+        (column + 2.2, index % dim - dim / 3),
         scale=0.2,
         other_router=1,
     )
@@ -210,8 +210,8 @@ for subnetwork in graphs_wan:
 hover_nodes_lan = HoverTool(
     tooltips=[
         ("MAC", "@MAC"),
-        ("IP v4", "@IP_v4"),
-        ("IP v6", "@IP_v6"),
+        ("IP", "@IP_v4"),
+        # ("IP v6", "@IP_v6"),
     ],
     renderers=[graph_renderer_lan.node_renderer],
 )
@@ -235,6 +235,9 @@ for subnetwork in graphs_wan:
     ntwk_index = graphs_wan.index(subnetwork)
     plot.renderers.append(graphs_renderers_wan[ntwk_index])
 plot.renderers.append(graph_renderer_lan)
+
+plot.xgrid.grid_line_color = None
+plot.ygrid.grid_line_color = None
 
 show(plot)
 end = time()
