@@ -18,10 +18,9 @@ from time import time
 from functions import *
 import json
 import matplotlib.pyplot as plt
-from netgraph._main import InteractiveGraph
+from modified_netgraph import NewInteractiveGraph
 import numpy as np
-
-# from pyvis.network import Network
+import pandas as pd
 from zoom import ZoomPan
 
 np.seterr(divide="ignore", invalid="ignore")
@@ -43,11 +42,11 @@ list_nodes = []
 ntwk_prefix = {}
 subnetworks = {0: []}
 mac = {}
-ipv4 = {i: [] for i in range(len(data["paquets"]))}
-ipv6 = {i: [] for i in range(len(data["paquets"]))}
-port = {i: [] for i in range(len(data["paquets"]))}
-service = {i: [] for i in range(len(data["paquets"]))}
-node_color = {i: "magenta" for i in range(len(data["paquets"]))}
+ipv4 = {}
+ipv6 = {}
+port = {}
+service = {}
+node_color = {}
 n_pkts = {}
 mapping = {}
 igmp = []
@@ -59,10 +58,6 @@ for packet in data["paquets"]:
     if packet["port_src"] == 80 or packet["port_src"] == 443:
         if packet["src"] not in mac[router]:
             mac[router].append(packet["src"])
-#     if packet["proto"] == 2:
-#         igmp.append([packet["ip_src"], packet["ip_dst"]])
-
-# print(igmp)
 
 i = 0
 while len(mac[router]) != 1 and i != 10:
@@ -180,22 +175,43 @@ for i in range(len(list_nodes)):
         for ip in ipv4[i]:
             annotations[i] += ip
 
-# nt = Network("500px", "1000px")
-# node_color_2 = [node_color[i] for i in node_color.keys()]
-# nt.add_nodes(list(graph.nodes), color=node_color_2)
-# nt.add_edges(graph.edges)
-# nt.show("hoho.html")
-
 fig, ax = plt.subplots()
 
-fig = InteractiveGraph(
+# df = pd.DataFrame({"MAC adress": [mac[0]], "IP adress": [ipv4[0]]})
+# df.set_index("externalId", inplace=True)
+# print(df)
+
+table = {}
+for index in range(len(list_nodes)):
+    if index not in mac.keys():
+        mac[index] = None
+    if type(ipv4[index]) == list:
+        table.update(
+            {
+                index: pd.DataFrame(
+                    {"MAC adress": [mac[index]], "IP adress": ipv4[index]},
+                    index=[""],
+                )
+            }
+        )
+    else:
+        table.update(
+            {
+                index: pd.DataFrame(
+                    {"MAC adress": [mac[index]], "IP adress": [ipv4[index]]},
+                    index=[""],
+                )
+            }
+        )
+
+fig = NewInteractiveGraph(
     graph,
-    annotations=annotations,
-    # node_labels=True,
+    # annotations=annotations,
     node_layout=layout,
     node_color=node_color,
     edge_width=0.4,
     edge_color="black",
+    tables=table,
 )
 
 scale = 1.1
