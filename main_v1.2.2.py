@@ -35,8 +35,6 @@ with open("numbers/ip-protocol-numbers.json") as file:
 with open("numbers/ethertypes.json") as file:
     ethertypes = json.load(file)
 
-print("Creating graph...")
-
 # Initialize variables
 list_nodes = []
 ntwk_prefix = {}
@@ -53,29 +51,61 @@ igmp = []
 
 router = 0
 mac[router] = []
+router_proto = []
+router_ip = []
+
+print("Finding router...")
 
 for packet in data["paquets"]:
     if packet["port_src"] == 80 or packet["port_src"] == 443:
-        if packet["src"] not in mac[router]:
-            mac[router].append(packet["src"])
+        src = packet["src"]
+        if src not in mac[router]:
+            mac[router].append(src)
+            index = mac[router].index(src)
+            router_proto.append([])
+            router_ip.append([])
+        index = mac[router].index(src)
+        proto = packet["proto"]
+        ip = packet["ip_src"]
+        if proto not in router_proto[index]:
+            router_proto[index].append(proto)
+        if ip not in router_ip[index]:
+            router_ip[index].append(ip)
 
 i = 0
 while len(mac[router]) != 1 and i != 10:
     print(mac[router])
     i += 1
-    for packet in data["paquets"]:
-        if packet["src"] in mac[router]:
-            if packet["proto"] == 89 or packet["ip_src"] == "224.0.0.9":
-                print(packet["ip_src"])
-                router = [packet["src"]]
-                break
-            elif packet["proto"] == 1:
-                mac[router].remove(packet["src"])
+    for potential_router in mac[router]:
+        try:
+            index = mac[router].index(potential_router)
+            for ip in router_ip[index]:
+                try:
+                    for other_ip in router_ip[index]:
+                        if (
+                            ip is not None
+                            and ip != "0.0.0.0"
+                            and other_ip is not None
+                            and other_ip != "0.0.0.0"
+                        ):
+                            if ip[:3] != other_ip[:3]:
+                                mac[router] = [potential_router]
+                                router_ip = []
+                                break
+                except IndexError:
+                    break
+        except ValueError:
+            break
+
 
 if len(mac[router]) != 1:
     print("failed to find router")
 else:
     list_nodes.append(mac[router][0])
+
+
+print("Creating graph...")
+
 
 # Create local network
 graph = nx.Graph()
@@ -145,7 +175,7 @@ for node in graph:
 layout = {}
 
 i = 0
-scale = 0.6
+scale = 1
 n_subnetworks = len(subnetworks)
 dim = round(math.sqrt(n_subnetworks))
 for subnetwork in subnetworks.keys():
@@ -166,30 +196,21 @@ for subnetwork in subnetworks.keys():
 
 annotations = {}
 
-for i in range(len(list_nodes)):
-    if i in mac.keys():
-        annotations[i] = "MAC : " + str(mac[i]) + "\nIP : "
-    else:
-        annotations[i] = "MAC : None\nIP : "
-    if ipv4[i] != None:
-        for ip in ipv4[i]:
-            annotations[i] += ip
-
 fig, ax = plt.subplots()
-
-# df = pd.DataFrame({"MAC adress": [mac[0]], "IP adress": [ipv4[0]]})
-# df.set_index("externalId", inplace=True)
-# print(df)
 
 table = {}
 for index in range(len(list_nodes)):
     if index not in mac.keys():
         mac[index] = None
     if type(ipv4[index]) == list:
+        ip_adress = ""
+        for ip in ipv4[index]:
+            if ip != None:
+                ip_adress += ip + ", "
         table.update(
             {
                 index: pd.DataFrame(
-                    {"MAC adress": [mac[index]], "IP adress": ipv4[index]},
+                    {"MAC adress": [mac[index]], "IP adress": ip_adress},
                     index=[""],
                 )
             }
@@ -198,7 +219,7 @@ for index in range(len(list_nodes)):
         table.update(
             {
                 index: pd.DataFrame(
-                    {"MAC adress": [mac[index]], "IP adress": [ipv4[index]]},
+                    {"MAC adress": [mac[index]], "IP adress": str(ipv4[index])},
                     index=[""],
                 )
             }

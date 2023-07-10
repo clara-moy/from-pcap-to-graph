@@ -124,6 +124,7 @@ def data_processing(
         list_nodes.append(device)
     index = list_nodes.index(device)
     mac[index] = device
+    ipv4[index] = [None]
     if ethertype == "ipV6":
         ipv6_device = packet["ip_" + src_or_dst]
         if index in ipv6.keys():
