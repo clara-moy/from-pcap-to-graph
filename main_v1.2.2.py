@@ -1,9 +1,10 @@
 """Takes a .json file with log data and plots a graph representing the topology of the network
 Usage:
 =====
-    python3 main_v1.py file_name.json
+    python3 main_v1.py file_name.json fig_name
 
     file_name: name of the file (with the relative path) from which we want data
+    fig_name: name of the saved figure
 """
 
 __authors__ = "Clara Moy"
@@ -21,6 +22,7 @@ import matplotlib.pyplot as plt
 from modified_netgraph import NewInteractiveGraph
 import numpy as np
 import pandas as pd
+import pickle
 from zoom import ZoomPan
 
 np.seterr(divide="ignore", invalid="ignore")
@@ -74,7 +76,6 @@ for packet in data["paquets"]:
 
 i = 0
 while len(mac[router]) != 1 and i != 10:
-    print(mac[router])
     i += 1
     for potential_router in mac[router]:
         try:
@@ -99,7 +100,7 @@ while len(mac[router]) != 1 and i != 10:
 
 
 if len(mac[router]) != 1:
-    print("failed to find router")
+    print("Failed to find router")
 else:
     list_nodes.append(mac[router][0])
 
@@ -194,9 +195,6 @@ for subnetwork in subnetworks.keys():
         )
     i += 1
 
-annotations = {}
-
-fig, ax = plt.subplots()
 
 table = {}
 for index in range(len(list_nodes)):
@@ -225,22 +223,37 @@ for index in range(len(list_nodes)):
             }
         )
 
+
+with open(sys.argv[2] + ".fig.pckl", "wb") as file:
+    pickle.dump(
+        {
+            "node_color": node_color,
+            "graph": graph,
+            "layout": layout,
+            "edge_width": 0.4,
+            "edge_color": "black",
+            "table": table,
+            "mapping": mapping,
+        },
+        file,
+    )
+
+fig, ax = plt.subplots()
+
 fig = NewInteractiveGraph(
     graph,
-    # annotations=annotations,
     node_layout=layout,
     node_color=node_color,
     edge_width=0.4,
     edge_color="black",
     tables=table,
+    mapping=mapping,
 )
 
 scale = 1.1
 zp = ZoomPan()
 figZoom = zp.zoom_factory(ax, base_scale=scale)
 figPan = zp.pan_factory(ax)
-
-fig.mouseover_highlight_mapping = mapping
 
 end = time()
 print("Done in", end - start, "s")
