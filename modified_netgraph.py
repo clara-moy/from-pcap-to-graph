@@ -2,6 +2,7 @@ from netgraph._main import (
     Graph,
     DraggableGraphWithGridMode,
 )
+import matplotlib as plt
 
 
 class EmphasizeOnClick(object):
@@ -123,13 +124,7 @@ class EmphasizeOnClickGraph(Graph, EmphasizeOnClick):
         keys = list(self.node_artists.keys()) + list(self.edge_artists.keys())
         self.artist_to_key = dict(zip(artists, keys))
         EmphasizeOnClick.__init__(self, mouseover_highlight_mapping)
-
         self.mouseover_highlight_mapping = mouseover_highlight_mapping
-
-        if "table_kwargs" in kwargs:
-            EmphasizeOnClick.__init__(self, self.artist_to_key, kwargs["table_kwargs"])
-        else:
-            EmphasizeOnClick.__init__(self, self.artist_to_key)
 
 
 class TableOnHover(object):
@@ -187,14 +182,16 @@ class TableOnHover(object):
                     colLabels=df.columns.values,
                     **self.table_kwargs,
                 )
-                self.fig.canvas.draw()
+                self.fig.canvas.draw_idle()
 
             # not on any artist
             if selected_artist is None:
                 if self.table:
-                    self.table.remove()
+                    for children in self.ax.get_children():
+                        if type(children) == plt.table.Table:
+                            children.remove()
                 self.table = None
-                self.fig.canvas.draw()
+                self.fig.canvas.draw_idle()
 
 
 class TableOnHoverGraph(Graph, TableOnHover):
