@@ -1,4 +1,5 @@
-"""Program that takes a .pcap file and creates a .json file with data from the .pcap file
+"""
+Takes a .pcap file and creates a .json file with data from the .pcap file
 
 Usage:
 =====

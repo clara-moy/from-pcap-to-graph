@@ -1,4 +1,5 @@
-"""Class that allows to zoom with the scroll wheel on matplotlib. 
+"""
+Allows to zoom with the scroll wheel on matplotlib. 
 source : https://stackoverflow.com/questions/11551049/matplotlib-plot-zooming-with-scroll-wheel
 """
 

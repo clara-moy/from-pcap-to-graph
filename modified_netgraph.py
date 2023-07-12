@@ -1,3 +1,7 @@
+"""
+Modifid netgraph that allows new features such as EmphasizeOnClick and TableOnHover
+"""
+
 from netgraph._main import (
     Graph,
     DraggableGraphWithGridMode,

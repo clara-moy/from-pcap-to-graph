@@ -1,3 +1,13 @@
+"""
+Reloads data from main.py and plots them (allows to not recalculate data)
+
+Usage:
+=====
+    python3 reload_image.py file_name
+
+    file_name: name of the file where data from main.py were saved
+"""
+
 import pickle
 import matplotlib.pyplot as plt
 import sys

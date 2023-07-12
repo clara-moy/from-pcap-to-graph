@@ -1,10 +1,10 @@
 """Takes a .json file with log data and plots a graph representing the topology of the network
 Usage:
 =====
-    python3 main_v1.py file_name.json fig_name
+    python3 main.py file_name.json save_file_name
 
     file_name: name of the file (with the relative path) from which we want data
-    fig_name: name of the saved figure
+    save_file_name: name of the file where data are saved
 """
 
 __authors__ = "Clara Moy"
@@ -20,6 +20,7 @@ from functions import *
 import json
 import matplotlib.pyplot as plt
 from modified_netgraph import NewInteractiveGraph
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pickle
@@ -33,23 +34,24 @@ start = time()
 with open(file_name) as file:
     data = json.load(file)
 with open("numbers/ip-protocol-numbers.json") as file:
-    ip_protocols_db = json.load(file)
+    ip_protocols_data = json.load(file)
 with open("numbers/ethertypes.json") as file:
-    ethertypes = json.load(file)
+    ethertypes_data = json.load(file)
+with open("numbers/ports.json") as file:
+    ports_data = json.load(file)
 
 # Initialize variables
 list_nodes = []
-ntwk_prefix = {}
+prefix_to_router_index = {}
 subnetworks = {0: []}
 mac = {}
 ipv4 = {}
 ipv6 = {}
-port = {}
-service = {}
+ports = {}
+services = {}
 node_color = {}
 n_pkts = {}
 mapping = {}
-igmp = []
 
 router = 0
 mac[router] = []
@@ -112,7 +114,7 @@ print("Creating graph...")
 graph = nx.Graph()
 for packet in data["paquets"]:
     try:
-        ethertype = ethertypes[str(packet["type"])]
+        ethertype = ethertypes_data[str(packet["type"])]
     except (KeyError, TypeError):
         ethertype = "unknown"
     if (
@@ -125,41 +127,39 @@ for packet in data["paquets"]:
         and packet["src"] != "ff:ff:ff:ff:ff:ff"
         and packet["dst"] != "ff:ff:ff:ff:ff:ff"
     ):
-        src_index, dist_src_index, src_ntwk_index, port_src = data_processing(
+        src_index, src_dist_index, src_ntwk_index, port_src = data_processing(
             packet,
             "src",
             list_nodes,
             mac,
             ethertype,
-            ipv6,
             ipv4,
-            port,
-            ntwk_prefix,
+            ports,
+            prefix_to_router_index,
             subnetworks,
         )
-        dst_index, dist_dst_index, dst_ntwk_index, port_dst = data_processing(
+        dst_index, dst_dist_index, dst_ntwk_index, port_dst = data_processing(
             packet,
             "dst",
             list_nodes,
             mac,
             ethertype,
-            ipv6,
             ipv4,
-            port,
-            ntwk_prefix,
+            ports,
+            prefix_to_router_index,
             subnetworks,
         )
         update_mapping(
-            src_index, dist_src_index, mapping, dst_index, graph, src_ntwk_index
+            src_index, src_ntwk_index, src_dist_index, dst_index, graph, mapping
         )
         update_mapping(
-            dst_index, dist_dst_index, mapping, src_index, graph, dst_ntwk_index
+            dst_index, dst_ntwk_index, dst_dist_index, src_index, graph, mapping
         )
 
 ipv4[router] = None
 ipv6[router] = None
-port[router] = None
-service[router] = None
+ports[router] = None
+services[router] = None
 
 print("Adjusting layout...")
 
@@ -244,7 +244,7 @@ fig = NewInteractiveGraph(
     graph,
     node_layout=layout,
     node_color=node_color,
-    edge_width=0.4,
+    edge_width=0.6,
     edge_color="black",
     tables=table,
     mapping=mapping,

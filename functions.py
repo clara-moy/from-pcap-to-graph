@@ -14,11 +14,10 @@ def data_processing(
     list_nodes,
     mac,
     ethertype,
-    ipv6,
     ipv4,
     port,
-    ntwk_prefix=None,
-    subnetworks=None,
+    prefix_to_router_index,
+    subnetworks,
 ):
     """_summary_
 
@@ -34,8 +33,6 @@ def data_processing(
         contain all already seen mac adresses associated to their index in list_nodes
     ethertype : str
         represent the ethertype of the packet (ex : "ipV4")
-    ipv6 : dict
-        contain all ipV6 adresses associated with their index in list_nodes
     ipv4 : dict
         contain all ipV4 adresses associated with their index in list_nodes
     list_subnetworks : list
@@ -44,11 +41,21 @@ def data_processing(
         contain all subnetworks indexes in list_subnetworks associated with their index in list_nodes
     port : dict
         contain all ports used by devices associated with their index in list_nodes
+    prefix_to_router_index : dict
+        associate network prefix to the index of ther router of the network
+    subnetworks : list of lists
+        list of list of nodes grouped by subnetwork
 
     Returns
     -------
-    _type_
-        _description_
+    int
+        index of the mac adress of the device in list_nodes
+    int
+        index of the node identifier in list_nodes (if it's in the local network: index of the mac adress, else: index of the ip adress)
+    int
+        index of the network in subnetworks
+    str
+        name of the processus used
     """
     device = packet[src_or_dst]
     if device not in list_nodes:
@@ -56,14 +63,7 @@ def data_processing(
     index = list_nodes.index(device)
     mac[index] = device
     ipv4[index] = [None]
-    if ethertype == "ipV6":
-        ipv6_device = packet["ip_" + src_or_dst]
-        if index in ipv6.keys():
-            if ipv6_device not in ipv6[index]:
-                ipv6[index].append(ipv6_device)
-        else:
-            ipv6[index] = [ipv6_device]
-    else:
+    if ethertype != "ipV6":
         ipv4_device = packet["ip_" + src_or_dst]
         if index in ipv4.keys():
             if ipv4_device not in ipv4[index]:
@@ -78,40 +78,59 @@ def data_processing(
             port[index].append(port_device)
     else:
         port[index] = [port_device]
-    if ntwk_prefix != None:
-        if index == 0:
-            if ipv4_device not in list_nodes:
-                list_nodes.append(ipv4_device)
-            new_index = list_nodes.index(ipv4_device)
-            ipv4[new_index] = ipv4_device
-            parsed_ip = ipv4_device.split(".")
-            if parsed_ip[0] in [str(i) for i in range(1, 128)]:
-                prefix = parsed_ip[0]
-            elif parsed_ip[0] in [str(i) for i in range(128, 192)]:
-                prefix = parsed_ip[0] + "." + parsed_ip[1]
-            elif parsed_ip[0] in [str(i) for i in range(192, 224)]:
-                prefix = parsed_ip[0] + "." + parsed_ip[1] + "." + parsed_ip[2]
-            if prefix not in ntwk_prefix.keys():
-                list_nodes.append(prefix)
-                ntwk_index = list_nodes.index(prefix)
-                subnetworks[ntwk_index] = []
+    if index == 0:
+        if ipv4_device not in list_nodes:
+            list_nodes.append(ipv4_device)
+        new_index = list_nodes.index(ipv4_device)
+        ipv4[new_index] = ipv4_device
+        parsed_ip = ipv4_device.split(".")
+        if parsed_ip[0] in [str(i) for i in range(1, 128)]:
+            prefix = parsed_ip[0]
+        elif parsed_ip[0] in [str(i) for i in range(128, 192)]:
+            prefix = parsed_ip[0] + "." + parsed_ip[1]
+        elif parsed_ip[0] in [str(i) for i in range(192, 224)]:
+            prefix = parsed_ip[0] + "." + parsed_ip[1] + "." + parsed_ip[2]
+        if prefix not in prefix_to_router_index.keys():
+            list_nodes.append(prefix)
             ntwk_index = list_nodes.index(prefix)
-            ipv4[ntwk_index] = prefix
-            ntwk_prefix[prefix] = ntwk_index
-            if new_index not in subnetworks[ntwk_index]:
-                subnetworks[ntwk_index].append(new_index)
-            return index, new_index, ntwk_index, port_device
-        else:
-            if index not in subnetworks[0]:
-                subnetworks[0].append(index)
-            return index, index, 0, port_device
+            subnetworks[ntwk_index] = []
+        ntwk_index = list_nodes.index(prefix)
+        ipv4[ntwk_index] = prefix
+        prefix_to_router_index[prefix] = ntwk_index
+        if new_index not in subnetworks[ntwk_index]:
+            subnetworks[ntwk_index].append(new_index)
+        return index, new_index, ntwk_index, port_device
     else:
-        return index, port_device
+        if index not in subnetworks[0]:
+            subnetworks[0].append(index)
+        return index, index, 0, port_device
 
 
 def update_mapping(
-    device_1_index, dist_device_index, mapping, device_2_index, graph, ntwk_router_index
+    device_1_index,
+    device_1_ntwk_index,
+    device_1_dist_index,
+    device_2_index,
+    graph,
+    mapping,
 ):
+    """Update mapping with path from device_1 to device_2
+
+    Parameters
+    ----------
+    device_1_index : int
+        index of the mac adress of the device (device_1) in list_nodes (if device_1 is beyond the router, index of the router of the local network)
+    device_1_ntwk_index : int
+        index of the network of device_1 in subnetworks
+    device_1_dist_index : int
+        index of the node identifier of device_1 in list_nodes (if it's in the local network: index of the mac adress, else: index of the ip adress)
+    device_2_index : int
+        index of the mac adress of the device (device_2) in list_nodes
+    graph : networkx.Graph
+        The graph that wee want to map
+    mapping : dict
+        contains mapping data linked to the index of the node
+    """
     if device_1_index in mapping.keys():
         if device_1_index not in mapping[device_1_index]:
             mapping[device_1_index] = [
@@ -135,27 +154,42 @@ def update_mapping(
         ]
     graph.add_edge(device_1_index, device_2_index)
     if device_1_index == 0:
-        graph.add_edge(dist_device_index, ntwk_router_index)
-        graph.add_edge(ntwk_router_index, device_1_index)
+        graph.add_edge(device_1_dist_index, device_1_ntwk_index)
+        graph.add_edge(device_1_ntwk_index, device_1_index)
         update_mapping_wan(
-            dist_device_index,
-            ntwk_router_index,
+            device_1_dist_index,
+            device_1_ntwk_index,
+            device_2_index,
             device_1_index,
             mapping,
-            device_2_index,
         )
         update_mapping_wan(
             device_2_index,
             device_1_index,
-            ntwk_router_index,
+            device_1_dist_index,
+            device_1_ntwk_index,
             mapping,
-            dist_device_index,
         )
 
 
 def update_mapping_wan(
-    device_1_index, router_1_index, router_2_index, mapping, device_2_index
+    device_1_index, router_1_index, device_2_index, router_2_index, mapping
 ):
+    """Update mapping for devices beyond the router
+
+    Parameters
+    ----------
+    device_1_index : int
+        index of device_1 in list_nodes
+    router_1_index : int
+        index of the first router linked with device_1
+    device_2_index : int
+        index of device_2 in list_nodes
+    router_2_index : int
+        index of the first router linked with device_2
+    mapping : dict
+        contains mapping data linked to the index of the node
+    """
     if device_1_index in mapping.keys():
         if device_1_index not in mapping[device_1_index]:
             mapping[device_1_index] = [
