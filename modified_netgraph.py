@@ -5,6 +5,8 @@ Modifid netgraph that allows new features such as EmphasizeOnClick and TableOnHo
 from netgraph._main import (
     Graph,
     DraggableGraphWithGridMode,
+    AnnotateOnClickGraph,
+    AnnotateOnClick,
 )
 import matplotlib as plt
 
@@ -180,13 +182,14 @@ class TableOnHover(object):
                     df = self.artist_to_table[selected_artist]
                 except KeyError:
                     return
-                self.table = self.ax.table(
-                    cellText=df.values.tolist(),
-                    rowLabels=df.index.values,
-                    colLabels=df.columns.values,
-                    **self.table_kwargs,
-                )
-                self.fig.canvas.draw_idle()
+                if not df.empty:
+                    self.table = self.ax.table(
+                        cellText=df.values.tolist(),
+                        rowLabels=df.index.values,
+                        colLabels=df.columns.values,
+                        **self.table_kwargs,
+                    )
+                    self.fig.canvas.draw_idle()
 
             # not on any artist
             if selected_artist is None:
@@ -222,8 +225,88 @@ class TableOnHoverGraph(Graph, TableOnHover):
             TableOnHover.__init__(self, self.artist_to_table)
 
 
+class AnnotateOnHover(object):
+    """Show or hide annotations when hovering on matplotlib artists."""
+
+    def __init__(self, artist_to_annotation, annotation_fontdict=None):
+        self.artists = list(self.node_artists.values()) + list(
+            self.edge_artists.values()
+        )
+        self.artist_to_annotation = artist_to_annotation
+        self.annotated_artists = set()
+        self.artist_to_text_object = dict()
+        self.annotation_fontdict = dict(backgroundcolor="white", clip_on=False)
+        if annotation_fontdict:
+            self.annotation_fontdict.update(annotation_fontdict)
+
+        self.fig.canvas.mpl_connect("motion_notify_event", self._on_motion)
+
+    def _on_motion(self, event):
+        if event.inaxes == self.ax:
+            # on artist
+            selected_artist = None
+            for artist in self.artists:
+                if artist.contains(event)[0]:  # returns two arguments for some reason
+                    selected_artist = artist
+                    break
+
+            if selected_artist:
+                params = self.annotation_fontdict.copy()
+                try:
+                    if isinstance(self.artist_to_annotation[selected_artist], str):
+                        self.artist_to_text_object[selected_artist] = self.ax.text(
+                            -2,
+                            0,
+                            self.artist_to_annotation[selected_artist],
+                            **params,
+                        )
+                    elif isinstance(self.artist_to_annotation[selected_artist], dict):
+                        params.update(self.artist_to_annotation[selected_artist].copy())
+                        self.artist_to_text_object[selected_artist] = self.ax.text(
+                            -2, 0, **params
+                        )
+                    self.fig.canvas.draw_idle()
+                except KeyError:
+                    return
+
+            # not on any artist
+            if selected_artist is None:
+                if self.artist_to_text_object != {}:
+                    for children in self.ax.get_children():
+                        if (
+                            type(children) == plt.text.Text
+                            and str(children)[:10] == "Text(-2, 0"
+                        ):
+                            children.remove()
+                self.fig.canvas.draw_idle()
+
+
+class AnnotateOnHoverGraph(Graph, AnnotateOnHover):
+    """Combines `AnnotateOnHover` with the `Graph` class such that nodes or edges can have toggleable annotations."""
+
+    def __init__(self, *args, **kwargs):
+        Graph.__init__(self, *args, **kwargs)
+
+        artist_to_annotation = dict()
+        if "annotations" in kwargs:
+            for key, annotation in kwargs["annotations"].items():
+                if key in self.nodes:
+                    artist_to_annotation[self.node_artists[key]] = annotation
+                elif key in self.edges:
+                    artist_to_annotation[self.edge_artists[key]] = annotation
+                else:
+                    raise ValueError(
+                        f"There is no node or edge with the ID {key} for the annotation '{annotation}'."
+                    )
+
+        AnnotateOnHover.__init__(self, artist_to_annotation)
+
+
 class NewInteractiveGraph(
-    EmphasizeOnClickGraph, TableOnHoverGraph, DraggableGraphWithGridMode
+    EmphasizeOnClickGraph,
+    TableOnHoverGraph,
+    DraggableGraphWithGridMode,
+    AnnotateOnHoverGraph,
 ):
     def __init__(self, *args, **kwargs):
         DraggableGraphWithGridMode.__init__(self, *args, **kwargs)
@@ -233,6 +316,28 @@ class NewInteractiveGraph(
         self._base_facecolor = dict(
             [(artist, artist.get_facecolor()) for artist in self._selectable_artists]
         )
+
+        artist_to_annotation = dict()
+        if "annotations" in kwargs:
+            for key, annotation in kwargs["annotations"].items():
+                # Test membership of edges first, as edge keys may
+                # result in a ValueError when testing membership of nodes.
+                if key in self.edges:
+                    artist_to_annotation[self.edge_artists[key]] = annotation
+                elif key in self.nodes:
+                    artist_to_annotation[self.node_artists[key]] = annotation
+                else:
+                    raise ValueError(
+                        f"There is no node or edge with the ID {key} for the annotation '{annotation}'."
+                    )
+
+        if "annotation_fontdict" in kwargs:
+            AnnotateOnHover.__init__(
+                self, artist_to_annotation, kwargs["annotation_fontdict"]
+            )
+        else:
+            AnnotateOnHover.__init__(self, artist_to_annotation)
+
         if "mapping" in kwargs:
             mapping = dict()
             for key, linked_nodes in kwargs["mapping"].items():
@@ -269,6 +374,8 @@ class NewInteractiveGraph(
                 self._redraw_annotations(event)
 
     def _on_motion(self, event):
+        if self.artist_to_annotation:
+            AnnotateOnHoverGraph._on_motion(self, event)
         TableOnHoverGraph._on_motion(self, event)
 
     def _select_artist(self, artist):

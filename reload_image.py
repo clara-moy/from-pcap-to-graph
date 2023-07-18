@@ -30,6 +30,7 @@ fig = NewInteractiveGraph(
     edge_color=data["edge_color"],
     tables=data["table"],
     mapping=data["mapping"],
+    annotations=data["annotations"],
 )
 
 scale = 1.1
