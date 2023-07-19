@@ -33,18 +33,39 @@ __date__ = "2023-06-26"
 
 np.seterr(divide="ignore", invalid="ignore")
 
-start = time()
 list_nodes = []
-prefix_to_router_index = {}
 subnetworks = {0: []}
 mac = {}
 ipv4 = {}
-ports = {}
 table = {}
 mapping = {}
 
 router = 0
 mac[router] = []
+
+
+def extract_data(data_file_name, ethertypes_data_file_name):
+    """Extract data from json files
+
+    Parameters
+    ----------
+    data_file_name : str
+        file name of the .json file obtained after executing from_json_to_pacp.py
+    ethertypes_data_file_name : str
+        name of the ethertypes data file
+
+    Returns
+    -------
+    dict
+        packets data
+    dict
+        ethertypes data
+    """
+    print("Extracting data...")
+
+    data = load_json(data_file_name)
+    ethertypes_data = load_json(ethertypes_data_file_name)
+    return data, ethertypes_data
 
 
 def load_json(file_name):
@@ -112,6 +133,98 @@ def find_router(data, mac, list_nodes, router):
         list_nodes.append(mac[router][0])
 
 
+def create_graph(
+    data,
+    ethertypes_data,
+    list_nodes,
+    mac,
+    ipv4,
+    subnetworks,
+    mapping,
+    table,
+):
+    """Create graph
+
+    Parameters
+    ----------
+    data : dict
+        data about the packets
+    ethertypes_data : dict
+        ethertypes
+    list_nodes : list
+        list of the identifiers of the nodes (MAC or IP adresses)
+    mac : dict
+        contain all already seen mac adresses associated to their index in list_nodes
+    ipv4 : dict
+        contain all ipV4 adresses associated with their index in list_nodes
+    subnetworks : dict
+        index of the subnetwork associated to all devices in the subnetwork
+    mapping : dict
+        contains mapping data linked to the index of the node
+    table : dict
+        index in list_nodes linked to the info wanted in the table
+
+    Returns
+    -------
+    networkx.classes.graph.Graph
+        the graph we want to plot
+    """
+    print("Creating graph...")
+
+    ports = {}
+    prefix_to_router_index = {}
+    graph = nx.Graph()
+    for packet in data["paquets"]:
+        try:
+            ethertype = ethertypes_data[str(packet["type"])]
+        except (KeyError, TypeError):
+            ethertype = "unknown"
+        if (
+            packet["ip_src"] is not None
+            and packet["ip_dst"] is not None
+            and packet["ip_src"][:4] != "ff02"
+            and packet["ip_dst"][:4] != "ff02"
+            and packet["ip_src"][:3] not in [str(i) for i in range(224, 240)]
+            and packet["ip_dst"][:3] not in [str(i) for i in range(224, 240)]
+            and packet["src"] != "ff:ff:ff:ff:ff:ff"
+            and packet["dst"] != "ff:ff:ff:ff:ff:ff"
+        ):
+            src_index, src_dist_index, src_ntwk_index, port_src = process_data(
+                packet,
+                "src",
+                list_nodes,
+                mac,
+                ethertype,
+                ipv4,
+                ports,
+                prefix_to_router_index,
+                subnetworks,
+            )
+            dst_index, dst_dist_index, dst_ntwk_index, port_dst = process_data(
+                packet,
+                "dst",
+                list_nodes,
+                mac,
+                ethertype,
+                ipv4,
+                ports,
+                prefix_to_router_index,
+                subnetworks,
+            )
+            update_table(
+                table, list_nodes, src_dist_index, port_src, dst_dist_index, port_dst
+            )
+            update_mapping(
+                src_index, src_ntwk_index, src_dist_index, dst_index, graph, mapping
+            )
+            update_mapping(
+                dst_index, dst_ntwk_index, dst_dist_index, src_index, graph, mapping
+            )
+    ipv4[router] = None
+    ports[router] = None
+    return graph
+
+
 def find_http_communication(data, mac, router):
     """Find if the packet contains a http communication
 
@@ -129,7 +242,6 @@ def find_http_communication(data, mac, router):
     list
         list of the ip adresses with http or https communications linked with the router
     """
-    router_proto = []
     router_ip = []
     for packet in data["paquets"]:
         if packet["port_src"] == 80 or packet["port_src"] == 443:
@@ -137,13 +249,9 @@ def find_http_communication(data, mac, router):
             if src not in mac[router]:
                 mac[router].append(src)
                 index = mac[router].index(src)
-                router_proto.append([])
                 router_ip.append([])
             index = mac[router].index(src)
-            proto = packet["proto"]
             ip = packet["ip_src"]
-            if proto not in router_proto[index]:
-                router_proto[index].append(proto)
             if ip not in router_ip[index]:
                 router_ip[index].append(ip)
     return router_ip
@@ -409,6 +517,41 @@ def update_mapping_wan(
         ]
 
 
+def adjust_layout(graph, list_nodes, subnetworks, mac, ipv4, table, mapping):
+    """All layout operations
+
+    Parameters
+    ----------
+    graph : networkx.Graph
+        The graph that wee want to map
+    list_nodes : list
+        list of the identifiers of the nodes (MAC or IP adresses)
+    subnetworks : list of lists
+        list of list of nodes grouped by subnetwork
+    mac : dict
+        contain all already seen mac adresses associated to their index in list_nodes
+    ipv4 : dict
+        contain all ipV4 adresses associated with their index in list_nodes
+    table : dict
+        index in list_nodes linked to the info wanted in the table
+    mapping : dict
+        contains mapping data linked to the index of the node
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    print("Adjusting layout...")
+
+    node_color = set_colors(graph, subnetworks)
+    layout = set_layout(subnetworks)
+    annotations = set_annotations(list_nodes, mac, ipv4)
+    change_table_type(table)
+    save_data(node_color, graph, layout, table, mapping, annotations)
+    return plot_graph(node_color, graph, layout, table, mapping, annotations)
+
+
 def set_colors(graph, subnetworks):
     """Set nodes colors
 
@@ -616,81 +759,25 @@ def plot_graph(
     zp = ZoomPan()
     figZoom = zp.zoom_factory(ax, base_scale=scale)
     figPan = zp.pan_factory(ax)
-    print(type(fig), type(ax), type((fig, ax)))
     return fig, ax
 
 
 if __name__ == "__main__":
-    print("Extracting data...")
-
-    data = load_json(sys.argv[1])
-    ip_protocols_data = load_json("numbers/ip-protocol-numbers.json")
-    ethertypes_data = load_json("numbers/ethertypes.json")
-    ports_data = load_json("numbers/ports.json")
-
+    start = time()
+    data, ethertypes_data = extract_data(sys.argv[1], "numbers/ethertypes.json")
     find_router(data, mac, list_nodes, router)
+    graph = create_graph(
+        data,
+        ethertypes_data,
+        list_nodes,
+        mac,
+        ipv4,
+        subnetworks,
+        mapping,
+        table,
+    )
 
-    print("Creating graph...")
-
-    graph = nx.Graph()
-    for packet in data["paquets"]:
-        try:
-            ethertype = ethertypes_data[str(packet["type"])]
-        except (KeyError, TypeError):
-            ethertype = "unknown"
-        if (
-            packet["ip_src"] is not None
-            and packet["ip_dst"] is not None
-            and packet["ip_src"][:4] != "ff02"
-            and packet["ip_dst"][:4] != "ff02"
-            and packet["ip_src"][:3] not in [str(i) for i in range(224, 240)]
-            and packet["ip_dst"][:3] not in [str(i) for i in range(224, 240)]
-            and packet["src"] != "ff:ff:ff:ff:ff:ff"
-            and packet["dst"] != "ff:ff:ff:ff:ff:ff"
-        ):
-            src_index, src_dist_index, src_ntwk_index, port_src = process_data(
-                packet,
-                "src",
-                list_nodes,
-                mac,
-                ethertype,
-                ipv4,
-                ports,
-                prefix_to_router_index,
-                subnetworks,
-            )
-            dst_index, dst_dist_index, dst_ntwk_index, port_dst = process_data(
-                packet,
-                "dst",
-                list_nodes,
-                mac,
-                ethertype,
-                ipv4,
-                ports,
-                prefix_to_router_index,
-                subnetworks,
-            )
-            update_table(
-                table, list_nodes, src_dist_index, port_src, dst_dist_index, port_dst
-            )
-            update_mapping(
-                src_index, src_ntwk_index, src_dist_index, dst_index, graph, mapping
-            )
-            update_mapping(
-                dst_index, dst_ntwk_index, dst_dist_index, src_index, graph, mapping
-            )
-
-    ipv4[router] = None
-    ports[router] = None
-
-    print("Adjusting layout...")
-
-    node_color = set_colors(graph, subnetworks)
-    layout = set_layout(subnetworks)
-    annotations = set_annotations(list_nodes, mac, ipv4)
-    change_table_type(table)
-    save_data(node_color, graph, layout, table, mapping, annotations)
-    fig, ax = plot_graph(node_color, graph, layout, table, mapping, annotations)
+    fig, ax = adjust_layout(graph, list_nodes, subnetworks, mac, ipv4, table, mapping)
 
     end = time()
     print("Done in", end - start, "s")
