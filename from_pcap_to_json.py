@@ -17,9 +17,38 @@ __date__ = "2023-06-26"
 from datetime import datetime
 import sys
 from time import time
+import dpkt
+import socket
+from dpkt.compat import compat_ord
 
 import json
 from scapy.all import rdpcap
+
+
+def mac_addr(address):
+    """Convert a MAC address to a readable/printable string
+
+    Args:
+        address (str): a MAC address in hex form (e.g. '\x01\x02\x03\x04\x05\x06')
+    Returns:
+        str: Printable/readable MAC address
+    """
+    return ":".join("%02x" % compat_ord(b) for b in address)
+
+
+def inet_to_str(inet):
+    """Convert inet object to a string
+
+    Args:
+        inet (inet struct): inet network address
+    Returns:
+        str: Printable/readable IP address
+    """
+    # First try ipv4 and then ipv6
+    try:
+        return socket.inet_ntop(socket.AF_INET, inet)
+    except ValueError:
+        return socket.inet_ntop(socket.AF_INET6, inet)
 
 
 print("Extracting data...")
@@ -31,46 +60,42 @@ data = {}
 data["paquets"] = []
 
 
-index = 0
-for packet in scapy_cap:
-    data["paquets"].append({"src": packet[0].src, "dst": packet[0].dst})
+with open("data/sample_1.pcap", "rb") as f:
+    pcap = dpkt.pcap.Reader(f)
+    index = 0
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        ip = eth.data
+        tcp = ip.data
+        data["paquets"].append(
+            {"src": mac_addr(eth.src), "dst": mac_addr(eth.dst), "ts": ts}
+        )
 
-    try:
-        data["paquets"][index].update({"type": packet[0].type})
-    except AttributeError:
-        data["paquets"][index].update({"type": None})
+        try:
+            data["paquets"][index].update({"type": eth.type})
+        except AttributeError:
+            data["paquets"][index].update({"type": None})
 
-    try:
-        data["paquets"][index].update({"ip_src": packet[1].psrc})
-        data["paquets"][index].update({"ip_dst": packet[1].pdst})
-    except (AttributeError, IndexError):
-        data["paquets"][index].update({"ip_src": None})
-        data["paquets"][index].update({"ip_dst": None})
+        try:
+            data["paquets"][index].update({"ip_src": inet_to_str(ip.src)})
+            data["paquets"][index].update({"ip_dst": inet_to_str(ip.dst)})
+        except (AttributeError, IndexError):
+            data["paquets"][index].update({"ip_src": None})
+            data["paquets"][index].update({"ip_dst": None})
 
-    try:
-        data["paquets"][index].update({"ip_src": packet[1].src})
-        data["paquets"][index].update({"ip_dst": packet[1].dst})
-    except (AttributeError, IndexError):
-        pass
+        # try:
+        #     data["paquets"][index].update({"ttl": ip.ttl})
+        # except (AttributeError, IndexError):
+        #     data["paquets"][index].update({"ttl": None})
 
-    try:
-        data["paquets"][index].update({"proto": packet[1].proto})
-    except (AttributeError, IndexError):
-        data["paquets"][index].update({"proto": None})
+        try:
+            data["paquets"][index].update({"port_src": tcp.sport})
+            data["paquets"][index].update({"port_dst": tcp.dport})
+        except (AttributeError, IndexError):
+            data["paquets"][index].update({"port_src": None})
+            data["paquets"][index].update({"port_dst": None})
 
-    # try:
-    #     data["paquets"][index].update({"ttl": packet[1].ttl})
-    # except (AttributeError, IndexError):
-    #     data["paquets"][index].update({"ttl": None})
-
-    try:
-        data["paquets"][index].update({"port_src": packet[2].sport})
-        data["paquets"][index].update({"port_dst": packet[2].dport})
-    except (AttributeError, IndexError):
-        data["paquets"][index].update({"port_src": None})
-        data["paquets"][index].update({"port_dst": None})
-
-    index += 1
+        index += 1
 
 
 data_string = json.dumps(data)
