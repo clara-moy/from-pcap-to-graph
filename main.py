@@ -779,6 +779,12 @@ if __name__ == "__main__":
 
     fig, ax = adjust_layout(graph, list_nodes, subnetworks, mac, ipv4, table, mapping)
 
+    try:
+        capture_beginning = data["paquets"][0]["ts"]
+        capture_end = data["paquets"][-1]["ts"]
+        print("The capture started on", capture_beginning, "and ended on", capture_end)
+    except KeyError:
+        pass
     end = time()
     print("Done in", end - start, "s")
     plt.show()

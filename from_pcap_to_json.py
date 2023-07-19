@@ -60,15 +60,18 @@ data = {}
 data["paquets"] = []
 
 
-with open("data/sample_1.pcap", "rb") as f:
+with open(file_name, "rb") as f:
     pcap = dpkt.pcap.Reader(f)
     index = 0
     for ts, buf in pcap:
         eth = dpkt.ethernet.Ethernet(buf)
         ip = eth.data
-        tcp = ip.data
         data["paquets"].append(
-            {"src": mac_addr(eth.src), "dst": mac_addr(eth.dst), "ts": ts}
+            {
+                "src": mac_addr(eth.src),
+                "dst": mac_addr(eth.dst),
+                "ts": str(datetime.fromtimestamp(ts)),
+            }
         )
 
         try:
@@ -89,6 +92,7 @@ with open("data/sample_1.pcap", "rb") as f:
         #     data["paquets"][index].update({"ttl": None})
 
         try:
+            tcp = ip.data
             data["paquets"][index].update({"port_src": tcp.sport})
             data["paquets"][index].update({"port_dst": tcp.dport})
         except (AttributeError, IndexError):
