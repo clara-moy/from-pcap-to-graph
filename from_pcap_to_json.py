@@ -22,7 +22,6 @@ import socket
 from dpkt.compat import compat_ord
 
 import json
-from scapy.all import rdpcap
 
 
 def mac_addr(address):
@@ -54,8 +53,6 @@ def inet_to_str(inet):
 print("Extracting data...")
 start = time()
 file_name = sys.argv[1]
-scapy_cap = rdpcap(file_name)
-print("Creating dictionnary...")
 data = {}
 data["paquets"] = []
 

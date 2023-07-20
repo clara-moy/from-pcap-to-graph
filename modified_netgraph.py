@@ -5,8 +5,6 @@ Modifid netgraph that allows new features such as EmphasizeOnClick and TableOnHo
 from netgraph._main import (
     Graph,
     DraggableGraphWithGridMode,
-    AnnotateOnClickGraph,
-    AnnotateOnClick,
 )
 import matplotlib as plt
 
