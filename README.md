@@ -1,4 +1,8 @@
-# S'il vous plaît... Dessine moi un réseau
+# Drawing graphs from .pcap files
 
-The goal of this code is to be able to easily see who communicates with who from a .pcap file. It creates an interactive graph where all the important data is.
+This project aims to automatize the drawing of interactive graphs from .pcap files. It creates images such as the following, where green nodes are the routers, cyan nodes are the devices in the local network and orange ones are the ones beyond the router of the local network. 
+
+<div style="text-align:center;">
+    <img src="images/network_graph_example.png" alt="drawing" width="80%"/>
+<div/>
 
